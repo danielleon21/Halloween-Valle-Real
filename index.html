@@ -839,9 +839,9 @@ body.is-tour .leaflet-control-zoom, body.is-tour .fit-btn, body.is-tour .compass
 .map-z-hi .street { font-size: 14px; }
 
 /* Ruta */
-.route-ahead { stroke-dasharray: 2 12; animation: march 0.9s linear infinite; filter: drop-shadow(0 0 4px var(--moon-glow)); }
+.route-ahead { stroke-dasharray: 2 12; animation: march 1.2s linear infinite; }
 @keyframes march { to { stroke-dashoffset: -14; } }
-.route-done { filter: drop-shadow(0 0 5px var(--pumpkin-glow)); }
+.route-done { }
 
 /* Casas */
 .pin-anchor, .ghost-anchor, .start-anchor { background: none; border: 0; }
@@ -868,7 +868,7 @@ body.is-tour .leaflet-control-zoom, body.is-tour .fit-btn, body.is-tour .compass
 .leaflet-marker-icon:focus-visible .pin { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 .spook { position: absolute; left: 0; top: 0; width: 34px; height: 40px; transform: translate(-50%, -88%); pointer-events: none; }
-.spook svg { width: 100%; height: 100%; filter: drop-shadow(0 0 10px var(--moon-glow)); animation: bob 1.8s ease-in-out infinite; }
+.spook svg { width: 100%; height: 100%; animation: bob 1.8s ease-in-out infinite; will-change: transform; }
 @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 .start-flag { position: absolute; left: 0; top: 0; transform: translate(-10%, -100%); display: flex; align-items: flex-end; gap: 4px; pointer-events: none; }
 .start-flag span { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--moon); background: rgba(15,11,21,.8); padding: 3px 7px; border-radius: 6px; border: 1px solid var(--line); white-space: nowrap; }
@@ -893,7 +893,7 @@ body.is-tour .tour-only { display: block; }
   padding: calc(env(safe-area-inset-top, 0px) + 12px) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
 }
 .tour-top .inner { max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 12px;
-  background: rgba(23,17,32,.82); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  background: rgba(23,17,32,.95);
   border: 1px solid var(--line); border-radius: 16px; padding: 9px 10px 9px 14px; }
 .tour-top .prog { flex: 1; min-width: 0; display: grid; gap: 5px; }
 .tour-top .prog span { font-size: 14px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
@@ -904,7 +904,7 @@ body.is-tour .tour-only { display: block; }
 
 .tour-dock { position: absolute; z-index: 1100; left: 0; right: 0; bottom: 0;
   padding: 0 max(12px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 12px) max(12px, env(safe-area-inset-left, 0px)); }
-.card { position: relative; max-width: 560px; margin: 0 auto; background: rgba(27,21,37,.94); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+.card { position: relative; max-width: 560px; margin: 0 auto; background: rgb(27,21,37);
   border: 1px solid var(--line); border-radius: 22px; padding: 16px 16px 14px; display: grid; gap: 12px;
   box-shadow: 0 -10px 40px rgba(0,0,0,.45); }
 .card .kicker { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--moon); }
@@ -1038,6 +1038,12 @@ body.is-picking { overflow: hidden; }
 body.is-picking .pin { animation: hint 1.2s ease-in-out infinite; }
 @keyframes hint { 50% { box-shadow: 0 0 0 6px var(--pumpkin-glow), 0 0 18px var(--pumpkin-glow); } }
 .tour-top .inner { gap: 8px; }
+/* Rendimiento en el recorrido: ocultar y pausar todo lo que queda detrás del mapa */
+body.is-tour .wrap, body.is-picking .wrap { visibility: hidden; }
+body.is-tour .mapwrap, body.is-picking .mapwrap { visibility: visible; }
+body.is-tour .stars, body.is-tour .bat, body.is-picking .stars, body.is-picking .bat { animation: none; }
+body.is-tour .pin { box-shadow: 0 0 0 3px var(--pumpkin-glow); transition: none; }
+.lantern { will-change: opacity; }
 .resume { margin: 14px 0 0; padding: 10px 12px; border-radius: 12px; background: rgba(15,11,21,.6); border: 1px solid var(--line); font-size: 14px; color: var(--ink-soft); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; max-width: 520px; }
 .resume b { color: var(--ink); }
 .resume.warn { border-color: var(--pumpkin); color: var(--ink); }
@@ -1347,6 +1353,7 @@ $('tTotal').textContent = N;
 })();
 
 /* ---------- Mapa ---------- */
+const routeSvg = L.svg({ padding: 0.3 });
 const map = L.map('map', { zoomControl: false, attributionControl: false, zoomSnap: 0.25, zoomDelta: 0.5, maxZoom: 21.5, tapTolerance: 20 });
 L.control.zoom({ position: 'topright', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar' }).addTo(map);
 L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 110 }).addTo(map);
@@ -1356,8 +1363,8 @@ const tok = n => css.getPropertyValue(n).trim();
 L.polygon(DATA.land, { stroke: false, fillColor: tok('--lot'), fillOpacity: 1, interactive: false }).addTo(map);
 L.polygon(DATA.park, { stroke: false, fillColor: tok('--park'), fillOpacity: 1, interactive: false }).addTo(map);
 DATA.trees.forEach(t => L.circle([t[0], t[1]], { radius: t[2], stroke: false, fillColor: tok('--tree'), fillOpacity: .9, interactive: false }).addTo(map));
-DATA.strips.forEach(p => L.polygon(p, { stroke: false, fillColor: tok('--roof'), fillOpacity: 1, interactive: false }).addTo(map));
-DATA.divs.forEach(d => L.polyline(d, { color: tok('--roof-line'), weight: 1, opacity: .8, interactive: false }).addTo(map));
+L.polygon(DATA.strips.map(r => [r]), { stroke: false, fillColor: tok('--roof'), fillOpacity: 1, interactive: false }).addTo(map);
+L.polyline(DATA.divs, { color: tok('--roof-line'), weight: 1, opacity: .8, interactive: false }).addTo(map);
 const roadStyle = { avenue: { c: tok('--avenue'), w: 15 }, faded: { c: tok('--road-faded'), w: 7 }, main: { c: tok('--road'), w: 8 } };
 const roads = [];
 ['avenue', 'faded', 'main'].forEach(kind => DATA.streets.filter(s => s.kind === kind).forEach(s => {
@@ -1369,8 +1376,9 @@ DATA.labels.forEach(l => {
 });
 
 const routeBase = L.polyline([], { color: tok('--moon'), weight: 2.5, opacity: .32, dashArray: '2 8', lineCap: 'round', interactive: false }).addTo(map);
-const routeDone = L.polyline([], { color: tok('--pumpkin'), weight: 4, opacity: .9, lineCap: 'round', lineJoin: 'round', className: 'route-done', interactive: false }).addTo(map);
-const routeAhead = L.polyline([], { color: tok('--moon'), weight: 4, opacity: 1, lineCap: 'round', className: 'route-ahead', interactive: false }).addTo(map);
+const routeGlow = L.polyline([], { renderer: routeSvg, color: tok('--pumpkin'), weight: 10, opacity: .18, lineCap: 'round', lineJoin: 'round', interactive: false }).addTo(map);
+const routeDone = L.polyline([], { color: tok('--pumpkin'), weight: 4, opacity: .9, lineCap: 'round', lineJoin: 'round', className: 'route-done', renderer: routeSvg, interactive: false }).addTo(map);
+const routeAhead = L.polyline([], { color: tok('--moon'), weight: 4, opacity: 1, lineCap: 'round', className: 'route-ahead', renderer: routeSvg, interactive: false }).addTo(map);
 const startMark = L.marker([0, 0], { icon: L.divIcon({ className: 'start-anchor', iconSize: [0, 0], html: '<span class="start-flag"><i></i><span>Inicio</span></span>' }), interactive: false, keyboard: false, zIndexOffset: 500 }).addTo(map);
 L.marker(toLL(GR.palapa[0], GR.palapa[1]), { icon: L.divIcon({ className: 'end-anchor', iconSize: [0, 0], html: `<span class="palapa">${PALAPA}<span>Palapa · fin</span></span>` }), interactive: false, keyboard: false, zIndexOffset: 400 }).addTo(map);
 
@@ -1413,14 +1421,18 @@ function moveGhost(toIdx) {
   const dur = Math.min(1600, 500 + Math.abs(P.cum[toIdx] - P.cum[from]) * 12), t0 = performance.now();
   const step = now => {
     const t = Math.min(1, (now - t0) / dur), e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-    ghostIdx = Math.round(from + (toIdx - from) * e); ghost.setLatLng(P.route[ghostIdx]); drawRoute();
+    ghostIdx = Math.round(from + (toIdx - from) * e); ghost.setLatLng(P.route[ghostIdx]); if (t === 1 || ghostIdx % 3 === 0) drawRoute();
     if (t < 1) ghostAnim = requestAnimationFrame(step);
   };
   ghostAnim = requestAnimationFrame(step);
 }
+let drawnKey = '';
 function drawRoute() {
-  if (mode !== 'tour') { routeDone.setLatLngs([]); routeAhead.setLatLngs([]); return; }
-  routeDone.setLatLngs(P.route.slice(0, ghostIdx + 1));
+  const key = mode === 'tour' ? ghostIdx + ':' + P.stops[cur].d + ':' + P.key : 'off';
+  if (key === drawnKey) return; drawnKey = key;
+  if (mode !== 'tour') { routeDone.setLatLngs([]); routeGlow.setLatLngs([]); routeAhead.setLatLngs([]); return; }
+  const done = P.route.slice(0, ghostIdx + 1);
+  routeDone.setLatLngs(done); routeGlow.setLatLngs(done);
   routeAhead.setLatLngs(P.route.slice(ghostIdx, P.stops[cur].d + 1));
 }
 
@@ -1478,7 +1490,9 @@ function frame(animate) {
   const mid = topH + (H - topH - cardH) / 2;
   const center = map.unproject(map.project([c.lat, c.lng], z).add([0, H / 2 - mid]), z);
   $('lantern').style.setProperty('--ly', Math.round(100 * mid / H) + '%');
-  if (animate && !reduceMotion) map.flyTo(center, z, { duration: 0.9 }); else map.setView(center, z, { animate: false });
+  if (!animate || reduceMotion) map.setView(center, z, { animate: false });
+  else if (Math.abs(map.getZoom() - z) < 0.01) map.panTo(center, { animate: true, duration: 0.55, easeLinearity: 0.3 });
+  else map.flyTo(center, z, { duration: 0.8 });
 }
 function renderCard() {
   const c = P.stops[cur], v = visited.has(c.id), next = P.stops[cur + 1];
@@ -1496,7 +1510,16 @@ function renderCard() {
 }
 function goTo(n, opts = {}) {
   cur = Math.min(Math.max(n, 0), N - 1);
-  save(); renderCard(); frame(opts.animate !== false); moveGhost(ghostTarget()); drawRoute();
+  save(); renderCard();
+  const animate = opts.animate !== false && !reduceMotion;
+  // Primero se mueve la cámara; el fantasma camina cuando el mapa ya se detuvo
+  if (animate) {
+    let fired = false;
+    const go = () => { if (fired) return; fired = true; moveGhost(ghostTarget()); };
+    map.once('moveend', go); setTimeout(go, 1100);
+    frame(true);
+  } else { frame(false); moveGhost(ghostTarget()); }
+  drawRoute();
 }
 function startTour(key, at) {
   startKey = key; P = plan(key); showPlan();
