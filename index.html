@@ -1038,6 +1038,21 @@ body.is-picking { overflow: hidden; }
 body.is-picking .pin { animation: hint 1.2s ease-in-out infinite; }
 @keyframes hint { 50% { box-shadow: 0 0 0 6px var(--pumpkin-glow), 0 0 18px var(--pumpkin-glow); } }
 .tour-top .inner { gap: 8px; }
+/* GPS */
+.gps-row { max-width: 560px; margin: 0 auto 8px; display: flex; justify-content: flex-end; }
+.gps-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: rgb(27,21,37); color: var(--ink); border-radius: 99px; padding: 9px 14px 9px 11px; font-weight: 700; font-size: 14px; cursor: pointer; }
+.gps-btn svg { width: 18px; height: 18px; }
+.gps-btn[aria-pressed="true"] { background: #2f7bff; border-color: #2f7bff; color: #fff; }
+.leaflet-control .gps-btn { box-shadow: none; }
+.gps-msg { position: absolute; z-index: 1150; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 78px); max-width: min(92%, 480px); margin: 0; text-align: center; background: rgb(27,21,37); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-size: 14px; color: var(--ink); }
+body:not(.is-tour) .gps-msg { top: 12px; }
+.me-anchor { background: none; border: 0; }
+.me { position: absolute; left: 0; top: 0; width: 18px; height: 18px; transform: translate(-50%, -50%); border-radius: 50%; background: #2f7bff; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.3); pointer-events: none; }
+.me::after { content: ""; position: absolute; inset: -9px; border-radius: 50%; background: rgba(47,123,255,.35); animation: mepulse 2s ease-out infinite; }
+@keyframes mepulse { from { transform: scale(.5); opacity: .9; } to { transform: scale(1.6); opacity: 0; } }
+.card.near { border-color: #2f7bff; box-shadow: 0 0 0 2px rgba(47,123,255,.45), 0 -10px 40px rgba(0,0,0,.45); }
+.spook .here { position: absolute; left: 50%; bottom: 100%; transform: translate(-50%, -2px); white-space: nowrap; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ground); background: var(--moon); padding: 2px 7px; border-radius: 6px; }
+.spook svg { display: block; }
 /* Rendimiento en el recorrido: ocultar y pausar todo lo que queda detrás del mapa */
 body.is-tour .wrap, body.is-picking .wrap { visibility: hidden; }
 body.is-tour .mapwrap, body.is-picking .mapwrap { visibility: visible; }
@@ -1102,7 +1117,9 @@ body.is-tour .pin { box-shadow: 0 0 0 3px var(--pumpkin-glow); transition: none;
         </div>
       </div>
 
+      <p class="gps-msg" id="gpsMsg" hidden></p>
       <div class="tour-dock tour-only">
+        <div class="gps-row"><button type="button" class="gps-btn" id="gpsBtnTour" aria-pressed="false" aria-label="Mostrar mi ubicación"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="3.2"/><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3"/><circle cx="10" cy="10" r="6.5"/></svg><span>Mi ubicación</span></button></div>
         <div class="card" aria-live="polite">
           <span class="toast" id="toast">+1 dulce</span>
           <div class="kicker"><span id="cKicker">Parada 1 de 69</span><span id="cDist"></span></div>
@@ -1353,8 +1370,11 @@ $('tTotal').textContent = N;
 })();
 
 /* ---------- Mapa ---------- */
-const routeSvg = L.svg({ padding: 0.3 });
-const map = L.map('map', { zoomControl: false, attributionControl: false, zoomSnap: 0.25, zoomDelta: 0.5, maxZoom: 21.5, tapTolerance: 20 });
+// Todo el croquis se dibuja de una vez con mucho margen alrededor de la pantalla,
+// así al moverse de casa en casa nunca aparecen calles o lotes de golpe.
+const base = L.svg({ padding: 4 });
+const routeSvg = L.svg({ padding: 4 });
+const map = L.map('map', { renderer: base, zoomControl: false, attributionControl: false, zoomSnap: 0.25, zoomDelta: 0.5, maxZoom: 21.5, tapTolerance: 20 });
 L.control.zoom({ position: 'topright', zoomInTitle: 'Acercar', zoomOutTitle: 'Alejar' }).addTo(map);
 L.control.scale({ position: 'bottomleft', imperial: false, maxWidth: 110 }).addTo(map);
 const css = getComputedStyle(document.documentElement);
@@ -1391,6 +1411,11 @@ const FitBtn = L.Control.extend({ options: { position: 'bottomright' }, onAdd() 
   const b = L.DomUtil.create('button', 'fit-btn'); b.type = 'button'; b.textContent = 'Ver toda la ruta';
   L.DomEvent.disableClickPropagation(b); b.addEventListener('click', () => { map.closePopup(); fitAll(true); }); return b; } });
 new FitBtn().addTo(map);
+const GpsCtl = L.Control.extend({ options: { position: 'bottomright' }, onAdd() {
+  const b = L.DomUtil.create('button', 'gps-btn'); b.type = 'button'; b.id = 'gpsBtnMap'; b.setAttribute('aria-pressed', 'false');
+  b.setAttribute('aria-label', 'Mostrar mi ubicación'); b.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="3.2"/><path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3"/><circle cx="10" cy="10" r="6.5"/></svg><span>Mi ubicación</span>';
+  L.DomEvent.disableClickPropagation(b); return b; } });
+new GpsCtl().addTo(map);
 
 const markers = {};
 casas.forEach(c => {
@@ -1411,7 +1436,7 @@ function showPlan() {
 }
 
 /* Fantasma */
-const ghost = L.marker([0, 0], { icon: L.divIcon({ className: 'ghost-anchor', iconSize: [0, 0], html: `<span class="spook">${GHOST}</span>` }), interactive: false, keyboard: false, zIndexOffset: 3000 });
+const ghost = L.marker([0, 0], { icon: L.divIcon({ className: 'ghost-anchor', iconSize: [0, 0], html: `<span class="spook">${GHOST}<span class="here">Aquí van</span></span>` }), interactive: false, keyboard: false, zIndexOffset: 3000 });
 let ghostIdx = 0, ghostAnim = 0;
 const ghostTarget = () => cur === 0 ? 0 : P.stops[cur - 1].d;
 function moveGhost(toIdx) {
@@ -1495,13 +1520,16 @@ function frame(animate) {
   else map.flyTo(center, z, { duration: 0.8 });
 }
 function renderCard() {
+  setTimeout(() => typeof updateNear === 'function' && updateNear(), 0);
   const c = P.stops[cur], v = visited.has(c.id), next = P.stops[cur + 1];
-  $('cKicker').textContent = `Parada ${cur + 1} de ${N}`;
+  $('cKicker').textContent = `Siguiente: parada ${cur + 1} de ${N}`;
   const dist = Math.round(P.cum[c.d] - P.cum[cur === 0 ? 0 : P.stops[cur - 1].d]);
   $('cDist').textContent = cur === 0 ? (dist < 5 ? 'aquí empiezan' : `a ${dist} m del inicio`) : `a ${dist} m`;
   const t = $('cTitle'); t.textContent = label(c); t.classList.remove('swap'); void t.offsetWidth; t.classList.add('swap');
   const toEnd = Math.round(P.len - P.cum[c.d]);
-  $('cMeta').innerHTML = next ? `Después: <b>${label(next)}</b>` : `Última casa. La palapa está a ${toEnd} m.`;
+  const prev = cur === 0 ? null : P.stops[cur - 1];
+  const from = prev ? `Vienen de <b>${label(prev)}</b>` : (dist < 5 ? 'Aquí empieza la ruta' : `Desde el inicio de la ruta`);
+  $('cMeta').innerHTML = from + (next ? ` · luego <b>${label(next)}</b>` : ` · después, la palapa (${toEnd} m)`);
   const mb = $('markBtn');
   mb.textContent = v ? (next ? 'Ir a la siguiente' : 'Llegar a la palapa') : 'Ya pasamos aquí';
   mb.classList.toggle('done', v);
@@ -1743,6 +1771,65 @@ function renderResume() {
   el.innerHTML = `<span>Tu avance está guardado: <b>${n} de ${N}</b> casas.</span><button type="button" class="linkish" id="resumeReset">Volver a empezar</button>`;
   $('resumeReset').onclick = () => { openSheet(); sheetAsking = true; renderSheetReset(); setTimeout(() => $('sheetReset').scrollIntoView({ block: 'nearest' }), 60); };
 }
+
+/* ---------- GPS: punto azul con la ubicación real ---------- */
+const meMarker = L.marker([0, 0], { icon: L.divIcon({ className: 'me-anchor', iconSize: [0, 0], html: '<span class="me"></span>' }), interactive: false, keyboard: false, zIndexOffset: 4000 });
+const meCircle = L.circle([0, 0], { renderer: routeSvg, radius: 10, color: '#2f7bff', weight: 1, opacity: .5, fillColor: '#2f7bff', fillOpacity: .12, interactive: false });
+let gpsWatch = null, me = null, lastShown = 0, firstFix = true, msgTimer = 0;
+const areaBounds = houseBounds.pad(0.6);
+function gpsMsg(t, ms) {
+  const el = $('gpsMsg'); clearTimeout(msgTimer);
+  if (!t) { el.hidden = true; return; }
+  el.textContent = t; el.hidden = false;
+  if (ms) msgTimer = setTimeout(() => el.hidden = true, ms);
+}
+function setGpsBtns(on) { ['gpsBtnTour', 'gpsBtnMap'].forEach(id => $(id)?.setAttribute('aria-pressed', String(on))); }
+function startGps() {
+  if (!('geolocation' in navigator)) return gpsMsg('Este navegador no puede compartir la ubicación.', 4000);
+  setGpsBtns(true); firstFix = true; gpsMsg('Buscando tu ubicación…');
+  gpsWatch = navigator.geolocation.watchPosition(onFix, onGpsErr, { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 });
+}
+function stopGps() {
+  if (gpsWatch != null) navigator.geolocation.clearWatch(gpsWatch);
+  gpsWatch = null; me = null; meMarker.remove(); meCircle.remove(); setGpsBtns(false); gpsMsg(''); updateNear();
+}
+function toggleGps() { if (gpsWatch == null) startGps(); else if (me) showMe(); else stopGps(); }
+function onFix(pos) {
+  const ll = L.latLng(pos.coords.latitude, pos.coords.longitude), acc = pos.coords.accuracy || 30, now = Date.now();
+  // Ahorro: solo redibujar si pasó ~1 s o se movió más de 2 m
+  if (me && now - lastShown < 900 && me.distanceTo(ll) < 2) return;
+  lastShown = now; me = ll;
+  meMarker.setLatLng(ll); meCircle.setLatLng(ll).setRadius(Math.min(acc, 80));
+  if (!map.hasLayer(meMarker)) { meMarker.addTo(map); meCircle.addTo(map); }
+  if (!areaBounds.contains(ll)) gpsMsg(`Estás a ${Math.round(ll.distanceTo(houseBounds.getCenter()))} m del fraccionamiento.`);
+  else if (acc > 35) gpsMsg(`Señal GPS débil (±${Math.round(acc)} m). Puede tardar en ajustarse.`);
+  else gpsMsg('');
+  if (firstFix) { firstFix = false; if (areaBounds.contains(ll)) showMe(); }
+  updateNear();
+}
+function onGpsErr(e) {
+  if (e.code === 1) { stopGps(); gpsMsg('No hay permiso de ubicación. Actívalo para este sitio en los ajustes del navegador.', 6000); }
+  else gpsMsg('No se pudo obtener la señal GPS. Intenta al aire libre.', 4000);
+}
+function showMe() {
+  if (!me) return;
+  if (mode === 'tour') {
+    const c = P.stops[cur];
+    map.fitBounds(L.latLngBounds([me, [c.lat, c.lng]]), { paddingTopLeft: [40, 110], paddingBottomRight: [40, 260], maxZoom: 20, animate: !reduceMotion });
+  } else map.setView(me, Math.max(map.getZoom(), 19), { animate: !reduceMotion });
+}
+// Avisar cuando ya están en la casa a la que van
+function updateNear() {
+  const card = document.querySelector('.card');
+  if (mode !== 'tour' || !me) { card.classList.remove('near'); return; }
+  const c = P.stops[cur], d = Math.round(me.distanceTo([c.lat, c.lng]));
+  const near = d <= 15;
+  card.classList.toggle('near', near);
+  $('cDist').textContent = near ? '¡ya llegaron!' : `a ${d} m de ti`;
+}
+$('gpsBtnTour').addEventListener('click', toggleGps);
+$('gpsBtnMap').addEventListener('click', toggleGps);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && gpsWatch != null) lastShown = 0; });
 
 showPlan();
 paint();
