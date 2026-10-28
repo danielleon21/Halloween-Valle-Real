@@ -1441,9 +1441,9 @@ function showPlan() {
 }
 
 /* Fantasma */
-const ghost = L.marker([0, 0], { icon: L.divIcon({ className: 'ghost-anchor', iconSize: [0, 0], html: `<span class="spook">${GHOST}<span class="here">Aquí van</span></span>` }), interactive: false, keyboard: false, zIndexOffset: 3000 });
+const ghost = L.marker([0, 0], { icon: L.divIcon({ className: 'ghost-anchor', iconSize: [0, 0], html: `<span class="spook">${GHOST}<span class="here">Vamos aquí</span></span>` }), interactive: false, keyboard: false, zIndexOffset: 3000 });
 let ghostIdx = 0, ghostAnim = 0;
-const ghostTarget = () => cur === 0 ? 0 : P.stops[cur - 1].d;
+const ghostTarget = () => P.stops[cur].d;
 function moveGhost(toIdx) {
   cancelAnimationFrame(ghostAnim);
   const from = Math.min(ghostIdx, P.route.length - 1);
@@ -1458,12 +1458,13 @@ function moveGhost(toIdx) {
 }
 let drawnKey = '';
 function drawRoute() {
-  const key = mode === 'tour' ? ghostIdx + ':' + P.stops[cur].d + ':' + P.key : 'off';
+  const nextD = () => cur < N - 1 ? P.stops[cur + 1].d : P.route.length - 1;
+  const key = mode === 'tour' ? ghostIdx + ':' + nextD() + ':' + P.key : 'off';
   if (key === drawnKey) return; drawnKey = key;
   if (mode !== 'tour') { routeDone.setLatLngs([]); routeGlow.setLatLngs([]); routeAhead.setLatLngs([]); return; }
   const done = P.route.slice(0, ghostIdx + 1);
   routeDone.setLatLngs(done); routeGlow.setLatLngs(done);
-  routeAhead.setLatLngs(P.route.slice(ghostIdx, P.stops[cur].d + 1));
+  routeAhead.setLatLngs(P.route.slice(ghostIdx, nextD() + 1));
 }
 
 /* Popup (modo mapa) */
@@ -1527,14 +1528,13 @@ function frame(animate) {
 function renderCard() {
   setTimeout(() => typeof updateNear === 'function' && updateNear(), 0);
   const c = P.stops[cur], v = visited.has(c.id), next = P.stops[cur + 1];
-  $('cKicker').textContent = `Siguiente: parada ${cur + 1} de ${N}`;
+  $('cKicker').textContent = `Parada ${cur + 1} de ${N}`;
   const dist = Math.round(P.cum[c.d] - P.cum[cur === 0 ? 0 : P.stops[cur - 1].d]);
-  $('cDist').textContent = cur === 0 ? (dist < 5 ? 'aquí empiezan' : `a ${dist} m del inicio`) : `a ${dist} m`;
+  $('cDist').textContent = cur === 0 ? (dist < 5 ? 'aquí empiezan' : `a ${dist} m del inicio`) : `a ${dist} m de la anterior`;
   const t = $('cTitle'); t.textContent = label(c); t.classList.remove('swap'); void t.offsetWidth; t.classList.add('swap');
   const toEnd = Math.round(P.len - P.cum[c.d]);
-  const prev = cur === 0 ? null : P.stops[cur - 1];
-  const from = prev ? `Vienen de <b>${label(prev)}</b>` : (dist < 5 ? 'Aquí empieza la ruta' : `Desde el inicio de la ruta`);
-  $('cMeta').innerHTML = from + (next ? ` · luego <b>${label(next)}</b>` : ` · después, la palapa (${toEnd} m)`);
+  const toNext = next ? Math.round(P.cum[next.d] - P.cum[c.d]) : toEnd;
+  $('cMeta').innerHTML = next ? `Después: <b>${label(next)}</b> · ${toNext} m` : `Después: la palapa · ${toEnd} m`;
   const mb = $('markBtn');
   mb.textContent = v ? (next ? 'Ir a la siguiente' : 'Llegar a la palapa') : 'Ya pasamos aquí';
   mb.classList.toggle('done', v);
@@ -1563,7 +1563,7 @@ function startTour(key, at) {
   document.body.classList.add('is-tour');
   map.closePopup(); ghost.addTo(map); window.scrollTo(0, 0); keepAwake(true);
   requestAnimationFrame(() => {
-    map.invalidateSize(); ghostIdx = ghostTarget(); ghost.setLatLng(P.route[ghostIdx]);
+    map.invalidateSize(); ghostIdx = cur === 0 ? 0 : ghostTarget(); ghost.setLatLng(P.route[ghostIdx]);
     goTo(cur, { animate: false }); render(); updateStart();
   });
 }
